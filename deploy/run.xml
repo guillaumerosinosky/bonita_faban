@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bonita>
+    <jvmConfig xmlns="http://faban.sunsource.net/ns/fabanharness">
+        <javaHome>/usr/lib/jvm/java-6-sun</javaHome>
+        <jvmOptions>-Xmx256m -Xms64m -XX:+DisableExplicitGC</jvmOptions>
+    </jvmConfig>
+    <!-- The definition binds the config file with the benchmark class -->
+    <!-- We declare the driver as the default namespace 'cause it is most common here -->
+    <fa:runConfig definition="com.testnscale.corehttp.BonitaRestDriver"
+                  xmlns:fa="http://faban.sunsource.net/ns/faban"
+                  xmlns:fh="http://faban.sunsource.net/ns/fabanharness"
+                  xmlns="http://faban.sunsource.net/ns/fabandriver">
+        <fh:description>Write the run description here.</fh:description>
+        <!-- The hostConfig section is used by the harness to control hosts -->
+        <fa:hostConfig>
+            <fa:host>localhost</fa:host>
+            <fh:tools></fh:tools>
+        </fa:hostConfig>
+        <!-- The scale of the benchmark run, the driver definition
+        defines the number of threads for each driver scale
+        and each driver type. -->
+        <fa:scale>1</fa:scale>
+        <!-- The rampup, steadystate, and rampdown of the driver -->
+        <fa:runControl unit="time">
+            <fa:rampUp>1</fa:rampUp>
+            <fa:steadyState>1</fa:steadyState>
+            <fa:rampDown>1</fa:rampDown>
+        </fa:runControl>
+        <!-- The driver-specific config.  -->
+        <driverConfig name="bonita">
+            <properties>
+                <property>
+                    <name>contextPath</name>
+                    <value>/</value>
+                </property>
+                <property>
+                    <name>secure</name>
+                    <value>false</value>
+                </property>
+                <property>
+                    <name>barFilePath</name>
+                    <value>/home/guillaume/research/benchflow/faban/bonita/Pool--1.0.bar</value>
+                </property>
+            </properties>
+        </driverConfig>
+    </fa:runConfig>
+    <webServer>
+        <fa:hostConfig xmlns="http://faban.sunsource.net/ns/fabanharness" xmlns:fa="http://faban.sunsource.net/ns/faban">
+            <fa:hostPorts>localhost:80</fa:hostPorts>
+            <enabled>false</enabled>
+            <tools>NONE</tools>
+        </fa:hostConfig>
+    </webServer>
+</bonita>
