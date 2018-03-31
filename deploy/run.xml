@@ -19,12 +19,12 @@
         <!-- The scale of the benchmark run, the driver definition
         defines the number of threads for each driver scale
         and each driver type. -->
-        <fa:scale>1</fa:scale>
+        <fa:scale>5</fa:scale>
         <!-- The rampup, steadystate, and rampdown of the driver -->
         <fa:runControl unit="time">
-            <fa:rampUp>1</fa:rampUp>
-            <fa:steadyState>1</fa:steadyState>
-            <fa:rampDown>1</fa:rampDown>
+            <fa:rampUp>6</fa:rampUp>
+            <fa:steadyState>50</fa:steadyState>
+            <fa:rampDown>6</fa:rampDown>
         </fa:runControl>
         <!-- The driver-specific config.  -->
         <driverConfig name="bonita">

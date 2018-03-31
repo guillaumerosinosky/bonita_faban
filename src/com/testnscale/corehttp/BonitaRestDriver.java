@@ -363,17 +363,8 @@ public class BonitaRestDriver {
 
     }
 
-    /**
-     * Do the request.
-     * @throws IOException An I/O or network error occurred.
-     * @throws ScriptException JSON processing error  *
-     */
-    @BenchmarkOperation (
-            name    = "Request",
-            max90th = 250, // 250 millisec
-            timing  = Timing.AUTO
-    )
-    public void doRequest() throws IOException, ScriptException {
+    @OnceBefore
+    public void initializeBonita() throws IOException, ScriptException  {
         if (initialized == true)
             return;
         initialized = true;
@@ -400,11 +391,32 @@ public class BonitaRestDriver {
 
         if (headers == null)
             initializeBonita(tenantId);
+    }
+
+
+    /**
+     * Do the request.
+     * @throws IOException An I/O or network error occurred.
+     * @throws ScriptException JSON processing error  *
+     */
+    @BenchmarkOperation (
+            name    = "Request",
+            max90th = 250, // 250 millisec
+            timing  = Timing.MANUAL
+    )
+    public void doRequest() throws IOException, ScriptException {
+        Integer tenantId = null;
+        if (tenantName != null)
+            tenantId = getTenantId(tenantName);
+
+	Map<String, String> headers = null;
+        ctx.recordTime();
         headers = login("user1","user1", tenantId);
         httpHeaders = headers;
         launchProcess();
+        ctx.recordTime();
 
-        //if (ctx.isTxSteadyState())
-        //    contentStats.sumContentSize[ctx.getOperationId()] += size;
+        if (ctx.isTxSteadyState())
+            contentStats.sumContentSize[ctx.getOperationId()] += 1;
     }
 }
