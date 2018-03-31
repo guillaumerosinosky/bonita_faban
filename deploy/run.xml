@@ -39,14 +39,18 @@
                 </property>
                 <property>
                     <name>barFilePath</name>
-                    <value>/home/guillaume/research/benchflow/faban/bonita/Pool--1.0.bar</value>
+                    <value>/home/ubuntu/bpm/TestHumanTask--1.0.bar</value>
                 </property>
+		<property>
+		    <name>tenant</name>
+		    <value>tenant1</value>
+		</property>
             </properties>
         </driverConfig>
     </fa:runConfig>
     <webServer>
         <fa:hostConfig xmlns="http://faban.sunsource.net/ns/fabanharness" xmlns:fa="http://faban.sunsource.net/ns/faban">
-            <fa:hostPorts>localhost:80</fa:hostPorts>
+            <fa:hostPorts>10.0.0.4:8080</fa:hostPorts>
             <enabled>false</enabled>
             <tools>NONE</tools>
         </fa:hostConfig>

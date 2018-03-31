@@ -55,23 +55,23 @@ import javax.script.ScriptException;
  * Basic web workload driver drives only one operation via a get request.
  */
 @BenchmarkDefinition (
-    name    = "Bonita Workload",
-    version = "0.1",
-    metric  = "req/s"
+        name    = "Bonita Workload",
+        version = "0.1",
+        metric  = "req/s"
 
 )
 @BenchmarkDriver (
-    name             = "bonita",
-    threadPerScale   = (float)1,
-    opsUnit          = "requests",
-    metric           = "req/s",
-    responseTimeUnit = TimeUnit.MILLISECONDS
+        name             = "bonita",
+        threadPerScale   = (float)1,
+        opsUnit          = "requests",
+        metric           = "req/s",
+        responseTimeUnit = TimeUnit.MILLISECONDS
 
 )
 @FixedTime (
-    cycleType = CycleType.THINKTIME,
-    cycleTime = 0,
-    cycleDeviation = 5
+        cycleType = CycleType.THINKTIME,
+        cycleTime = 0,
+        cycleDeviation = 5
 )
 public class BonitaRestDriver {
     public static Boolean initialized = false;
@@ -84,7 +84,9 @@ public class BonitaRestDriver {
     private ScriptEngine engine;
     Map<String, String> httpHeaders;
     public String barFilePath;
-    public String userId;
+    public Integer userId;
+    public String tenantName;
+
 
     /**
      * Constructs the basic web workload driver.
@@ -133,6 +135,10 @@ public class BonitaRestDriver {
 
         // Retrieve BAR file path
         barFilePath = ctx.getProperty("barFilePath");
+
+        // Retrieve tenant name
+        tenantName = ctx.getProperty("tenant");
+
     }
 
     protected Map jsonToMap(String json) throws ScriptException {
@@ -149,14 +155,32 @@ public class BonitaRestDriver {
         String script = "Java.asJSONCompatible(" + json + ")";
         List result = null;
         result = (List) this.engine.eval(script);
-
-        return (Map) result.get(index);
+        if (result.size() > 0) {
+            return (Map) result.get(index);
+        } else
+        {
+            return null;
+        }
     }
 
-    public Map<String, String> login(String user, String password) throws IOException {
+    protected List jsonToListMap(String json) throws ScriptException {
+
+        String script = "Java.asJSONCompatible(" + json + ")";
+        List result = null;
+
+        return (List) this.engine.eval(script);
+    }
+
+
+    public Map<String, String> login(String user, String password, Integer tenantId) throws IOException, ScriptException {
         logger.info(String.format("Logging to Bonita with (%s:%s)", user, password));
         StringBuilder response;
-        response = http.fetchURL(url + String.format("bonita/loginservice?username=%s&password=%s&redirect=false", user,password), "");
+        if (tenantId == null) {
+            response = http.fetchURL(url + String.format("bonita/loginservice?username=%s&password=%s&redirect=false", user, password), "");
+        } else {
+            response = http.fetchURL(url + String.format("bonita/loginservice?username=%s&password=%s&tenant=%d&redirect=false", user, password, tenantId), "");
+        }
+
         logger.info(String.format("POST Launched login install response = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
         if (http.getResponseCode() != 200) {
             return null;
@@ -168,24 +192,114 @@ public class BonitaRestDriver {
 
         headers.put("X-Bonita-API-Token", csrf_token[0]);
         headers.put("Content-Type", "application/json");
+        userId = getUserId(user);
 
         return headers;
     }
+
+    public Map<String, String> platformLogin(String user, String password) throws IOException {
+        logger.info(String.format("Platform logging to Bonita with (%s:%s)", user, password));
+        StringBuilder response;
+        response = http.fetchURL(url + String.format("bonita/platformloginservice?username=%s&password=%s&redirect=false", user, password), "");
+
+        logger.info(String.format("POST Launched platform login install response = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
+        if (http.getResponseCode() != 200) {
+            return null;
+        }
+        String[] csrf_token = http.getCookieValuesByName("X-Bonita-API-Token");
+        logger.info("Retrieved X-Bonita-API-Token : " + csrf_token[0]);
+        //""" {"userName":"user1","password":"user1","firstname":"user1","lastname":"plop", "enabled": "true"} """
+        Map<String, String> headers = new HashMap<String, String>();
+
+
+        headers.put("X-Bonita-API-Token", csrf_token[0]);
+        headers.put("Content-Type", "application/json");
+
+        return headers;
+    }
+
+
+
 
     public void logout() throws IOException {
         // Log out
         http.fetchURL(url + "bonita/logoutservice");
     }
 
-    public void initializeBonita() throws IOException, ScriptException {
-        Map<String, String> headers = login("install", "install");
+    public Integer getUserId(String name) throws IOException, ScriptException {
+        StringBuilder response;
+
+        response = http.fetchURL(url + "bonita/API/identity/user?f=userName=" + name);
+        logger.info(String.format("GET user = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
+        if (http.getResponseCode() == 200) {
+            Map contents = jsonToMap(response.toString(), 0);
+            if (contents != null) {
+                Integer userId = Integer.parseInt((String) contents.get("id"));
+                return userId;
+            }
+        }
+        return null;
+    }
+
+    public Integer getTenantId(String name) throws IOException, ScriptException {
+        Map<String, String> headers = platformLogin("platformAdmin", "platform");
+
+        StringBuilder response;
+        //response = http.fetchURL(url + String.format("bonita/API/platform/tenant?f=name=%s", name));
+        response = http.fetchURL(url + "bonita/API/platform/tenant?p=0");
+        logger.info(String.format("GET tenant = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
+        if (http.getResponseCode() == 200) {
+            logger.info("Tenants : " + response.toString());
+            List listContents = jsonToListMap(response.toString());
+            for (int i = 0; i < listContents.size(); i++) {
+                Map m = (Map) listContents.get(i);
+                String found = (String) m.get("name");
+                if (found.equals(name)) {
+                    Integer id = Integer.parseInt((String) m.get("id"));
+                    return id;
+                }
+            }
+        }
+
+        return null;
+    }
+
+
+    public Integer initializeTenant(String tenant) throws IOException, ScriptException {
+        logger.info("Initializing tenant" + tenant);
+
+        StringBuilder response;
+        Map<String, String> headers = platformLogin("platformAdmin", "platform");
+
+        // Create tenant
+        response = http.fetchURL(url + "bonita/API/platform/tenant", String.format("{\"username\":\"tenantAdmin\",\"password\":\"password\",\"name\":\"%s\"}", tenant), headers);
+        logger.info(String.format("POST bonita/API/platform/tenant response = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
+        Map contents = jsonToMap(response.toString());
+        Integer tenantId = Integer.parseInt((String) contents.get("id"));
+        logger.info("Tenant created with id " + tenantId.toString());
+        // activate process
+        response = ((ApacheHC3Transport) http).putURL(url + String.format("bonita/API/platform/tenant/%s",tenantId.toString()), "{\"state\":\"ACTIVATED\"}".getBytes(Charset.forName("UTF-8")), headers);
+
+        logger.info(String.format("PUT tenant on %s = %d - %s - %s", tenantId.toString(), http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
+        return tenantId;
+    }
+
+    public void initializeBonita(Integer tenantId) throws IOException, ScriptException {
+        logger.info("Initializing Bonita");
+
+        Map<String, String> headers = null;
+        if (tenantId == null) {
+            headers = login("install", "install", null);
+        } else {
+            headers = login("tenantAdmin", "password", tenantId);
+        }
 
         // Create user
         StringBuilder response;
         response = http.fetchURL(url + "bonita/API/identity/user/", "{\"userName\":\"user1\",\"password\":\"user1\",\"firstname\":\"user1\",\"lastname\":\"plop\", \"enabled\": \"true\"}", headers);
         logger.info(String.format("POST user1 response = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
-        userId = (String) jsonToMap(response.toString()).get("id");
-        logger.info("userId="+userId);
+        userId = Integer.parseInt((String) jsonToMap(response.toString()).get("id"));
+        logger.info("userId="+userId.toString());
 
         // Assign profile 1 to user1
         response = http.fetchURL(url + "bonita/API/userXP/profileMember/", "{\"profile_id\":1,\"member_type\":\"USER\",\"user_id\": 1}", headers);
@@ -196,7 +310,7 @@ public class BonitaRestDriver {
         logger.info(String.format("POST profile 2 to user1 response = %d - %s - %s", http.getResponseCode(), http.getResponseBuffer(), http.dumpResponseHeaders()));
 
         logout();
-        headers = login("user1","user1");
+        headers = login("user1","user1", tenantId);
 
 
         File model = new File(barFilePath);
@@ -262,14 +376,31 @@ public class BonitaRestDriver {
     public void doRequest() throws IOException, ScriptException {
         if (initialized == true)
             return;
-        logger.info("Begin");
         initialized = true;
         // 7.5 http://localhost:80/bonita/API/system/session/unusedId
         // 7.4
-        Map<String, String> headers = login("user1", "user1");
+        Map<String, String> headers = null;
+        Integer tenantId = null;
+
+        if (tenantName == "") {
+            logger.info("Beginning test for default tenant.");
+            headers = login("user1", "user1", null);
+        } else {
+            logger.info(String.format("Beginning test for tenant %s.",tenantName));
+            tenantId = getTenantId(tenantName);
+            if (tenantId != null) {
+                logger.info(String.format("Tenant %s found with id %d", tenantName, tenantId));
+                headers = login("user1", "user1", tenantId);
+            } else {
+                logger.info(String.format("Tenant %s not found. Initializing.", tenantName));
+                tenantId = initializeTenant(tenantName);
+                logger.info(String.format("Tenant %s initialized with id %d.", tenantName, tenantId));
+            }
+        }
+
         if (headers == null)
-            initializeBonita();
-            headers = login("user1","user1");
+            initializeBonita(tenantId);
+        headers = login("user1","user1", tenantId);
         httpHeaders = headers;
         launchProcess();
 
